@@ -21,6 +21,29 @@ from skimage.measure import label
 
 
 # ### Main function ###
+# -*- coding: utf-8 -*-
+# Author: Arthur Imbert <arthur.imbert.pro@gmail.com>
+# License: BSD 3 clause
+
+"""
+Functions to detect spots in 2-d and 3-d.
+"""
+
+import warnings
+
+import scipy.ndimage as ndi
+import numpy as np
+
+import bigfish.stack as stack
+
+from .utils import get_object_radius_pixel
+from .utils import get_breaking_point
+
+from skimage.measure import regionprops
+from skimage.measure import label
+
+
+# ### Main function ###
 
 def detect_spots(
         images,
@@ -30,7 +53,8 @@ def detect_spots(
         voxel_size=None,
         spot_radius=None,
         log_kernel_size=None,
-        minimum_distance=None):
+        minimum_distance=None, 
+        spread = 1):
     """Apply LoG filter followed by a Local Maximum algorithm to detect spots
     in a 2-d or 3-d image.
 
@@ -194,7 +218,8 @@ def detect_spots(
             remove_duplicate=remove_duplicate,
             return_threshold=return_threshold,
             log_kernel_size=log_kernel_size,
-            min_distance=minimum_distance)
+            min_distance=minimum_distance,
+            spread=spread)
     else:
         spots = _detect_spots_from_images(
             images,
@@ -202,7 +227,8 @@ def detect_spots(
             remove_duplicate=remove_duplicate,
             return_threshold=return_threshold,
             log_kernel_size=log_kernel_size,
-            min_distance=minimum_distance)
+            min_distance=minimum_distance,
+            spread=spread)
 
     # format results
     if not is_list:
@@ -221,7 +247,8 @@ def _detect_spots_from_images(
         remove_duplicate=True,
         return_threshold=False,
         log_kernel_size=None,
-        min_distance=None):
+        min_distance=None,
+        spread=1):
     """Apply LoG filter followed by a Local Maximum algorithm to detect spots
     in a 2-d or 3-d image.
 
@@ -291,7 +318,7 @@ def _detect_spots_from_images(
     if threshold is None:
 
         # get threshold values we want to test
-        thresholds = _get_candidate_thresholds(pixel_values)
+        thresholds = _get_candidate_thresholds(pixel_values, spread)
 
         # get spots count and its logarithm
         all_value_spots = []
@@ -485,7 +512,7 @@ def spots_thresholding(
 
 # ### Threshold selection ###
 
-def automated_threshold_setting(image, mask_local_max):
+def automated_threshold_setting(image, mask_local_max, spread=1):
     """Automatically set the optimal threshold to detect spots.
 
     In order to make the thresholding robust, it should be applied to a
@@ -518,7 +545,7 @@ def automated_threshold_setting(image, mask_local_max):
         dtype=bool)
 
     # get threshold values we want to test
-    thresholds = _get_candidate_thresholds(image.ravel())
+    thresholds = _get_candidate_thresholds(image.ravel(), spread)
 
     # get spots count and its logarithm
     first_threshold = float(thresholds[0])
@@ -538,7 +565,7 @@ def automated_threshold_setting(image, mask_local_max):
     return optimal_threshold
 
 
-def _get_candidate_thresholds(pixel_values):
+def _get_candidate_thresholds(pixel_values, spread=1):
     """Choose the candidate thresholds to test for the spot detection.
 
     Parameters
@@ -554,7 +581,7 @@ def _get_candidate_thresholds(pixel_values):
     """
     # choose appropriate thresholds candidate
     start_range = 0
-    end_range = int(np.percentile(pixel_values, 99.9999))
+    end_range = int(np.percentile(pixel_values, 99.9999)/spread)
     if end_range < 100:
         thresholds = np.linspace(start_range, end_range, num=100)
     else:
@@ -599,7 +626,8 @@ def get_elbow_values(
         voxel_size=None,
         spot_radius=None,
         log_kernel_size=None,
-        minimum_distance=None):
+        minimum_distance=None,
+        spread=1):
     """Get values to plot the elbow curve used to automatically set the
     threshold to detect spots.
 
@@ -760,7 +788,7 @@ def get_elbow_values(
         masks.append(mask_local_max)
 
     # get threshold values we want to test
-    thresholds = _get_candidate_thresholds(pixel_values)
+    thresholds = _get_candidate_thresholds(pixel_values, spread)
 
     # get spots count and its logarithm
     all_value_spots = []
